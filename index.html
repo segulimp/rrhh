@@ -176,8 +176,9 @@ function tierPillClass(tier){
 }
 
 function soloDigitos(tel){
-  if(!tel) return '';
-  let d = tel.replace(/[^0-9]/g, '');
+  if(tel === null || tel === undefined || tel === '') return '';
+  let d = String(tel).replace(/[^0-9]/g, '');
+  if(!d) return '';
   // Si no arranca con 54 (Argentina), se lo agregamos
   if(!d.startsWith('54')) d = '54' + d;
   return d;
