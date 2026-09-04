@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Segulimp — Seguimiento de Candidatos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#182A38; --ink-soft:#4C6070;
+    --paper:#EAF2F7; --paper-2:#D3E3EC; --card:#FFFFFF;
+    --brand:#245B84; --brand-dark:#163C58; --brand-light:#7EC1E0;
+    --line:#C7D8E2;
+    --good:#3F8F5D; --good-bg:#E6F4EB;
+    --mid:#D89B2E; --mid-bg:#FBF1DD;
+    --low:#8C97A0; --low-bg:#EEF2F5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1180px; margin:0 auto; padding:24px 20px 60px;}
+  header{display:flex; align-items:center; gap:14px; margin-bottom:24px; border-bottom:3px solid var(--brand); padding-bottom:16px;}
+  header img{height:52px; width:52px; border-radius:50%; flex:none;}
+  header .name{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:24px; color:var(--brand-dark); text-transform:uppercase; line-height:1;}
+  header .tag{font-size:13px; color:var(--ink-soft); margin-top:3px;}
+
+  .funnel{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:24px;}
+  .funnel .card{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 18px;}
+  .funnel .num{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:32px; color:var(--brand-dark); line-height:1;}
+  .funnel .lbl{font-size:12.5px; color:var(--ink-soft); margin-top:4px;}
+
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center;}
+  .toolbar input[type=text]{flex:1; min-width:200px; padding:10px 14px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:14px; background:#fff;}
+  .toolbar select{padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:'Inter',sans-serif; font-size:14px; background:#fff; color:var(--ink);}
+
+  .table-wrap{background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden;}
+  table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  thead th{text-align:left; padding:12px 14px; background:var(--paper); color:var(--ink-soft); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.03em; border-bottom:1px solid var(--line);}
+  tbody td{padding:12px 14px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#F7FAFC;}
+  .name-cell{font-weight:600; color:var(--ink);}
+  .contact-cell{color:var(--ink-soft); font-size:12.5px; line-height:1.5;}
+  .score{font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:19px;}
+  .tier-pill{display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:600;}
+  .tier-avanza{background:var(--good-bg); color:var(--good);}
+  .tier-no{background:var(--low-bg); color:var(--low);}
+  .tier-revisar{background:var(--mid-bg); color:var(--mid);}
+
+  select.etapa-select{padding:6px 10px; border-radius:6px; border:1px solid var(--line); font-size:12.5px; font-family:'Inter',sans-serif; background:#fff; color:var(--ink); max-width:180px;}
+
+  .actions{display:flex; gap:6px; flex-wrap:wrap;}
+  .btn-icon{
+    display:inline-flex; align-items:center; gap:5px; padding:6px 10px; border-radius:6px; border:1px solid var(--line);
+    background:#fff; font-size:12px; font-weight:600; cursor:pointer; color:var(--ink); text-decoration:none; white-space:nowrap;
+  }
+  .btn-icon:hover{border-color:var(--brand); color:var(--brand-dark);}
+  .btn-icon.wa{color:#25A05B; border-color:#BFE3CC;}
+  .btn-icon.wa:hover{background:#E9F9EF;}
+  .btn-icon.cal{color:var(--brand); border-color:var(--brand-light);}
+  .btn-icon.cal:hover{background:#EAF3FA;}
+
+  .empty{padding:40px; text-align:center; color:var(--ink-soft); font-size:14px;}
+  .loading{padding:40px; text-align:center; color:var(--ink-soft); font-size:14px;}
+
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--brand-dark); color:#fff; padding:10px 18px; border-radius:8px; font-size:13.5px;
+    opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  .toast.show{opacity:1;}
+
+  @media (max-width:720px){
+    table, thead, tbody, th, td, tr{display:block;}
+    thead{display:none;}
+    tbody tr{border-bottom:1px solid var(--line); padding:12px 14px;}
+    tbody td{border:none; padding:4px 0;}
+    tbody td:before{content:attr(data-label); display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-soft); margin-bottom:2px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="data:image/png;base64,__LOGO_BASE64__" alt="Segulimp">
+    <div>
+      <div class="name">Segulimp</div>
+      <div class="tag">Seguimiento del proceso de selección comercial</div>
+    </div>
+  </header>
+
+  <div class="funnel" id="funnel"></div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Buscar por nombre...">
+    <select id="filterEtapa">
+      <option value="">Todas las etapas</option>
+      <option value="CV evaluado">CV evaluado</option>
+      <option value="Avanza a test situacional">Avanza a test situacional</option>
+      <option value="Test enviado">Test enviado</option>
+      <option value="Test completado">Test completado</option>
+      <option value="Entrevista agendada">Entrevista agendada</option>
+      <option value="Entrevistado">Entrevistado</option>
+      <option value="Contratado">Contratado</option>
+      <option value="Descartado">Descartado</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table id="tabla">
+      <thead>
+        <tr>
+          <th>Candidato</th>
+          <th>Contacto</th>
+          <th>Puntaje CV</th>
+          <th>Etapa</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="5" class="loading">Cargando candidatos…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ====== CONFIGURACIÓN ======
+// Completar con los datos del proyecto de Supabase antes de deployar.
+const SUPABASE_URL = "__SUPABASE_URL__";
+const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+// Link del test situacional (una vez publicado). Se usa en el botón "Enviar test".
+const TEST_LINK = "__TEST_LINK__";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const ETAPAS = [
+  "CV evaluado",
+  "Avanza a test situacional",
+  "Test enviado",
+  "Test completado",
+  "Entrevista agendada",
+  "Entrevistado",
+  "Contratado",
+  "Descartado"
+];
+
+let candidatos = [];
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function tierPillClass(tier){
+  if(!tier) return 'tier-no';
+  if(tier.toLowerCase().includes('avanza')) return 'tier-avanza';
+  if(tier.toLowerCase().includes('revisar')) return 'tier-revisar';
+  return 'tier-no';
+}
+
+function soloDigitos(tel){
+  if(!tel) return '';
+  let d = tel.replace(/[^0-9]/g, '');
+  // Si no arranca con 54 (Argentina), se lo agregamos
+  if(!d.startsWith('54')) d = '54' + d;
+  return d;
+}
+
+function linkWhatsapp(candidato, mensaje){
+  const tel = soloDigitos(candidato.telefono);
+  if(!tel) return null;
+  return `https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`;
+}
+
+function linkCalendar(candidato){
+  const texto = encodeURIComponent(`Entrevista - ${candidato.nombre} (Segulimp)`);
+  const detalles = encodeURIComponent(
+    `Entrevista por videollamada con ${candidato.nombre} para el puesto de vendedor comercial en Segulimp.\n\n` +
+    `Contacto: ${candidato.telefono || ''} ${candidato.email || ''}\n\n` +
+    `Recordá activar "Agregar videollamada de Google Meet" al guardar el evento.`
+  );
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${texto}&details=${detalles}`;
+}
+
+async function cargarCandidatos(){
+  const { data, error } = await supabase
+    .from('candidatos')
+    .select('*')
+    .order('puntaje_cv', { ascending: false });
+
+  if(error){
+    document.getElementById('tbody').innerHTML =
+      `<tr><td colspan="5" class="empty">No se pudo conectar con la base de datos.<br>Revisá la configuración de Supabase en el código.</td></tr>`;
+    console.error(error);
+    return;
+  }
+  candidatos = data || [];
+  renderFunnel();
+  renderTabla();
+}
+
+function renderFunnel(){
+  const conteos = {};
+  ETAPAS.forEach(e => conteos[e] = 0);
+  candidatos.forEach(c => { conteos[c.etapa] = (conteos[c.etapa] || 0) + 1; });
+
+  const el = document.getElementById('funnel');
+  el.innerHTML = `
+    <div class="card"><div class="num">${candidatos.length}</div><div class="lbl">Total CVs</div></div>
+    ${ETAPAS.map(e => `
+      <div class="card"><div class="num">${conteos[e]}</div><div class="lbl">${e}</div></div>
+    `).join('')}
+  `;
+}
+
+function renderTabla(){
+  const search = document.getElementById('search').value.trim().toLowerCase();
+  const filtroEtapa = document.getElementById('filterEtapa').value;
+
+  let filtrados = candidatos.filter(c => {
+    const matchNombre = !search || c.nombre.toLowerCase().includes(search);
+    const matchEtapa = !filtroEtapa || c.etapa === filtroEtapa;
+    return matchNombre && matchEtapa;
+  });
+
+  const tbody = document.getElementById('tbody');
+  if(filtrados.length === 0){
+    tbody.innerHTML = `<tr><td colspan="5" class="empty">No hay candidatos que coincidan con la búsqueda.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtrados.map(c => {
+    const waLink = linkWhatsapp(c, `Hola ${c.nombre.split(' ')[0]}! Te escribimos de Segulimp por tu postulación al puesto de vendedor comercial.`);
+    const waTestLink = linkWhatsapp(c, `Hola ${c.nombre.split(' ')[0]}! Fuiste seleccionado/a para la siguiente etapa del proceso de Segulimp: un breve test situacional. Podés completarlo acá: ${TEST_LINK}`);
+    const calLink = linkCalendar(c);
+
+    return `
+    <tr data-id="${c.id}">
+      <td data-label="Candidato" class="name-cell">${c.nombre}</td>
+      <td data-label="Contacto" class="contact-cell">${c.telefono || '—'}<br>${c.email || ''}</td>
+      <td data-label="Puntaje CV">
+        <span class="score">${c.puntaje_cv ?? '—'}</span>
+        <span class="tier-pill ${tierPillClass(c.tier_cv)}">${c.tier_cv || 'Sin evaluar'}</span>
+      </td>
+      <td data-label="Etapa">
+        <select class="etapa-select" onchange="cambiarEtapa(${c.id}, this.value)">
+          ${ETAPAS.map(e => `<option value="${e}" ${e === c.etapa ? 'selected' : ''}>${e}</option>`).join('')}
+        </select>
+      </td>
+      <td data-label="Acciones">
+        <div class="actions">
+          ${waLink ? `<a class="btn-icon wa" href="${waLink}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+          ${waTestLink ? `<a class="btn-icon wa" href="${waTestLink}" target="_blank" rel="noopener" onclick="marcarTestEnviado(${c.id})">Enviar test</a>` : ''}
+          <a class="btn-icon cal" href="${calLink}" target="_blank" rel="noopener" onclick="marcarEntrevistaAgendada(${c.id})">Agendar entrevista</a>
+        </div>
+      </td>
+    </tr>
+    `;
+  }).join('');
+}
+
+async function cambiarEtapa(id, nuevaEtapa){
+  const { error } = await supabase.from('candidatos').update({ etapa: nuevaEtapa }).eq('id', id);
+  if(error){ toast('No se pudo actualizar la etapa.'); console.error(error); return; }
+  const c = candidatos.find(c => c.id === id);
+  if(c) c.etapa = nuevaEtapa;
+  renderFunnel();
+  toast('Etapa actualizada');
+}
+
+async function marcarTestEnviado(id){
+  const c = candidatos.find(c => c.id === id);
+  if(c && c.etapa !== 'Test completado' && c.etapa !== 'Contratado'){
+    await supabase.from('candidatos').update({ etapa: 'Test enviado' }).eq('id', id);
+    c.etapa = 'Test enviado';
+    renderFunnel();
+    renderTabla();
+    toast('Marcado como "Test enviado"');
+  }
+}
+
+async function marcarEntrevistaAgendada(id){
+  const c = candidatos.find(c => c.id === id);
+  if(c){
+    await supabase.from('candidatos').update({ etapa: 'Entrevista agendada' }).eq('id', id);
+    c.etapa = 'Entrevista agendada';
+    renderFunnel();
+    renderTabla();
+    toast('Marcado como "Entrevista agendada"');
+  }
+}
+
+document.getElementById('search').addEventListener('input', renderTabla);
+document.getElementById('filterEtapa').addEventListener('change', renderTabla);
+
+cargarCandidatos();
+</script>
+</body>
+</html>
